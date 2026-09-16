@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <EditText
+        android:id="@+id/editName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="トリガー名（例: 出前館 注文）" />
+
+    <EditText
+        android:id="@+id/editKeyword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="キーワード（件名・本文／任意）" />
+
+    <EditText
+        android:id="@+id/editSender"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="送信元アドレス（任意）" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textSize="12sp"
+        android:text="どちらか片方だけでもOK。両方入れると「その送信元から届いた、そのキーワードを含むメール」だけを印刷します。" />
+
+    <Switch
+        android:id="@+id/switchEnabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="このトリガーを有効にする" />
+</LinearLayout>

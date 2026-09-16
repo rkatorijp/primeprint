@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Prime Auto Print</string>
+    <string name="notification_channel_name">Prime Auto Print</string>
+    <string name="notification_channel_desc">メール監視が動いていることを表示します</string>
+</resources>

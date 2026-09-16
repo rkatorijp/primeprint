@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp"
+            android:text="状態: 停止中"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gmail アカウント"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/editGmailAddress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Gmailアドレス"
+            android:inputType="textEmailAddress" />
+
+        <EditText
+            android:id="@+id/editAppPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="アプリパスワード（16桁・スペースはそのままでOK）"
+            android:inputType="textPassword" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="トリガー（何件でも登録・個別にオンオフ）"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnAddTrigger"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="＋ 追加" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/triggerContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="プリンター"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <EditText
+            android:id="@+id/editPrinterIp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="プリンターIPアドレス（例: 192.168.1.50）"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/editPrinterPort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="ポート番号（通常 9100）"
+            android:inputType="number"
+            android:text="9100" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="チェック間隔"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <RadioGroup
+            android:id="@+id/groupInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/interval5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="5秒" />
+
+            <RadioButton
+                android:id="@+id/interval10"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10秒" />
+
+            <RadioButton
+                android:id="@+id/interval30"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="30秒" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="印刷レイアウト"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <Switch
+            android:id="@+id/switchBodyOnly"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="本文だけ印刷する（差出人・件名を省く）" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="12sp"
+            android:text="レシート幅" />
+
+        <RadioGroup
+            android:id="@+id/groupPaper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/paper58"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="58mm (32桁)" />
+
+            <RadioButton
+                android:id="@+id/paper80"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="80mm (48桁)" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="12sp"
+            android:text="文字コード（日本語が化けるときは切り替えて文字テスト印刷）" />
+
+        <RadioGroup
+            android:id="@+id/groupCharset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/charSjis"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Shift_JIS" />
+
+            <RadioButton
+                android:id="@+id/charUtf8"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="UTF-8" />
+        </RadioGroup>
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="設定を保存" />
+
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="監視を開始" />
+
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="監視を停止" />
+
+        <Button
+            android:id="@+id/btnTestPrint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="文字テスト印刷（日本語・英数の確認）" />
+
+        <Button
+            android:id="@+id/btnDiagnose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="接続チェック（ログイン・メール取得を確認）" />
+
+        <TextView
+            android:id="@+id/textDiag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="24dp"
+            android:fontFamily="monospace"
+            android:textSize="12sp"
+            android:text="" />
+
+    </LinearLayout>
+</ScrollView>
