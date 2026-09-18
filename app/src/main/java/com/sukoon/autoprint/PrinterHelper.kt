@@ -28,6 +28,13 @@ object PrinterHelper {
     private val INIT = byteArrayOf(0x1B, 0x40)               // ESC @   initialize
     private val INTL_JAPAN = byteArrayOf(0x1B, 0x52, 0x08)   // ESC R 8 international char set = Japan
     private val CODEPAGE_KATAKANA = byteArrayOf(0x1B, 0x74, 0x01) // ESC t 1  single-byte page = Katakana
+    // FS C 1  Kanji code system = Shift_JIS. Epson's own ESC/POS reference: the printer's
+    // Kanji code system defaults to JIS (FS C 0) on power-up, and in that default state
+    // "FS &" alone is NOT enough — the printer decodes the following 2-byte pairs as raw
+    // JIS, not Shift_JIS. Since we always encode with Shift_JIS (MS932), skipping this
+    // command is exactly why real receipts came out garbled even with 文字コード=Shift_JIS
+    // selected: kanji mode was on, but the printer was reading our Shift_JIS bytes as JIS.
+    private val KANJI_CODE_SHIFTJIS = byteArrayOf(0x1C, 0x43, 0x01)
     private val KANJI_ON = byteArrayOf(0x1C, 0x26)           // FS &    enter Kanji (2-byte) mode
     private val KANJI_OFF = byteArrayOf(0x1C, 0x2E)          // FS .    leave Kanji mode
     private val FEED_AND_CUT = byteArrayOf(
@@ -188,6 +195,7 @@ object PrinterHelper {
             if (shiftJis) {
                 out.write(INTL_JAPAN)
                 out.write(CODEPAGE_KATAKANA)
+                out.write(KANJI_CODE_SHIFTJIS) // tell the printer our kanji bytes are Shift_JIS, not JIS
                 out.write(KANJI_ON)          // without this, kanji print as garbage
             }
 
