@@ -7,12 +7,7 @@ import javax.mail.Message
 import javax.mail.Session
 import javax.mail.Store
 import javax.mail.internet.MimeMultipart
-import javax.mail.search.AndTerm
-import javax.mail.search.BodyTerm
 import javax.mail.search.FlagTerm
-import javax.mail.search.FromStringTerm
-import javax.mail.search.SearchTerm
-import javax.mail.search.SubjectTerm
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Properties
@@ -49,52 +44,67 @@ object MailChecker {
         message.getHeader("Message-ID")?.firstOrNull() ?: message.messageNumber.toString()
 
     /**
-     * Unread + (subject OR body contains keyword) + (from contains sender).
-     *
-     * This used to be a single combined query — AndTerm(UNSEEN, OrTerm(SUBJECT, BODY))
-     * [+ AndTerm(..., FROM)] — sent to Gmail as one IMAP SEARCH command. Gmail's IMAP
-     * SEARCH implementation is known to reply "BAD Could not parse command" for exactly
-     * this shape of query once the SUBJECT/BODY literal contains non-ASCII text (e.g.
-     * Japanese keywords): https://github.com/markmclaren/java-gmail-imap/issues/9 and
-     * several other IMAP client libraries report the same Gmail-side quirk. Once one
-     * trigger's search threw, the old code aborted the whole loop, so every trigger
-     * after the broken one silently stopped printing — forever, every cycle.
-     *
-     * Fix: run each criterion as its own simple single-term search (UNSEEN+SUBJECT,
-     * UNSEEN+BODY, UNSEEN+FROM) and merge the results here in Kotlin instead of asking
-     * Gmail to parse a compound OR/AND query with a literal inside it. Each of the
-     * three searches is also isolated in its own try/catch so a problem with one
-     * criterion can't take down the other two.
+     * All unread messages in the inbox. UNSEEN is the only thing we ever ask
+     * Gmail's IMAP SEARCH to evaluate — it's a plain flag, always ASCII, so it
+     * never runs into the problem below.
      */
-    private fun searchTrigger(inbox: Folder, trigger: Trigger): List<Message> {
-        val unseen = FlagTerm(Flags(Flags.Flag.SEEN), false)
+    private fun fetchUnseen(inbox: Folder): List<Message> =
+        try {
+            inbox.search(FlagTerm(Flags(Flags.Flag.SEEN), false)).toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
 
-        fun safeSearch(term: SearchTerm): List<Message> =
-            try {
-                inbox.search(AndTerm(unseen, term)).toList()
+    /**
+     * Keyword/sender matching used to be done via Gmail IMAP SEARCH (SUBJECT/BODY/
+     * FROM terms). That broke in two ways once the keyword was Japanese (or any
+     * non-ASCII text):
+     *
+     * 1. A single combined query — AndTerm(UNSEEN, OrTerm(SUBJECT, BODY)) — made
+     *    Gmail reply "BAD Could not parse command" whenever the literal had
+     *    non-ASCII text in it, which aborted the whole loop and silently stopped
+     *    every trigger after the broken one, forever. That was fixed by splitting
+     *    into per-criterion searches (see git history) — but a second, separate
+     *    problem remained:
+     * 2. Even a lone SUBJECT/BODY search with a Japanese literal doesn't throw,
+     *    but JavaMail's IMAP client encodes non-ASCII search literals in a way
+     *    Gmail's SEARCH does not reliably match against, so the search just comes
+     *    back with zero hits — no error, it just never matches. This is exactly
+     *    why an English keyword worked and a Japanese one silently never did.
+     *
+     * Fix: never send free-text keywords to Gmail's SEARCH at all. Only UNSEEN
+     * (always ASCII) is sent over IMAP; subject/body/from matching is done here,
+     * locally, as a plain Kotlin substring check, which works identically for
+     * Japanese and English text.
+     */
+    private fun matches(message: Message, trigger: Trigger, bodyCache: MutableMap<String, String>): Boolean {
+        val keyword = trigger.keyword.trim()
+        val sender = trigger.sender.trim()
+
+        if (sender.isNotBlank()) {
+            val from = try {
+                message.from?.joinToString(" ") { it.toString() } ?: ""
             } catch (e: Exception) {
-                emptyList()
+                ""
             }
-
-        val keywordHits = LinkedHashMap<String, Message>()
-        if (trigger.keyword.isNotBlank()) {
-            for (m in safeSearch(SubjectTerm(trigger.keyword))) keywordHits[msgKey(m)] = m
-            for (m in safeSearch(BodyTerm(trigger.keyword))) keywordHits[msgKey(m)] = m
+            if (!from.contains(sender, ignoreCase = true)) return false
         }
 
-        if (trigger.sender.isBlank()) {
-            return keywordHits.values.toList()
+        if (keyword.isNotBlank()) {
+            val subject = try {
+                message.subject ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+            if (!subject.contains(keyword, ignoreCase = true)) {
+                val body = bodyCache.getOrPut(msgKey(message)) {
+                    try { extractPlainText(message) } catch (e: Exception) { "" }
+                }
+                if (!body.contains(keyword, ignoreCase = true)) return false
+            }
         }
 
-        val senderHits = LinkedHashMap<String, Message>()
-        for (m in safeSearch(FromStringTerm(trigger.sender))) senderHits[msgKey(m)] = m
-
-        return if (trigger.keyword.isBlank()) {
-            senderHits.values.toList()
-        } else {
-            // both filled in: must match keyword AND sender
-            keywordHits.keys.filter { it in senderHits }.mapNotNull { keywordHits[it] }
-        }
+        return keyword.isNotBlank() || sender.isNotBlank()
     }
 
     fun nowLabel(): String = SimpleDateFormat("HH:mm:ss").format(Date())
@@ -120,24 +130,27 @@ object MailChecker {
         try {
             val inbox = store.getFolder("INBOX")
             inbox.open(Folder.READ_WRITE)
+            val unseen = fetchUnseen(inbox)
+            val bodyCache = HashMap<String, String>()
             val alreadyDone = HashSet<String>()
             for (trigger in triggers) {
-                // Isolated per trigger: one trigger's search failing (bad keyword,
-                // transient IMAP error, etc.) must not stop the other triggers from
-                // being checked this cycle.
-                val messages = try {
-                    searchTrigger(inbox, trigger)
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                for (message in messages) {
+                // Isolated per trigger: one trigger's matching failing must not
+                // stop the other triggers from being checked this cycle.
+                for (message in unseen) {
                     val key = msgKey(message)
-                    if (!alreadyDone.add(key)) continue // matched by an earlier trigger already
+                    if (key in alreadyDone) continue // matched by an earlier trigger already
+                    val hit = try {
+                        matches(message, trigger, bodyCache)
+                    } catch (e: Exception) {
+                        false
+                    }
+                    if (!hit) continue
                     val body = buildPrintText(message, trigger, Prefs.bodyOnly(context))
                     val fitted = PrinterHelper.wrap(PrinterHelper.tidy(body), Prefs.columns(context))
                     val ok = PrinterHelper.printText(ip, port, fitted, Prefs.charset(context))
                     if (ok) {
                         message.setFlag(Flags.Flag.SEEN, true)
+                        alreadyDone.add(key)
                         printed++
                     }
                 }
@@ -180,12 +193,13 @@ object MailChecker {
         try {
             val inbox = store.getFolder("INBOX")
             inbox.open(Folder.READ_ONLY)
-            val unread = inbox.search(FlagTerm(Flags(Flags.Flag.SEEN), false))
+            val unread = fetchUnseen(inbox)
             lines.append("OK 受信トレイを読めました（未読 ${unread.size}件）\n")
 
             val triggers = Prefs.loadTriggers(context)
             if (triggers.isEmpty()) lines.append("NG トリガーが1件も登録されていません\n")
 
+            val bodyCache = HashMap<String, String>()
             var totalHits = 0
             for (t in triggers) {
                 if (!t.enabled) {
@@ -197,7 +211,7 @@ object MailChecker {
                     continue
                 }
                 val hits = try {
-                    searchTrigger(inbox, t)
+                    unread.filter { matches(it, t, bodyCache) }
                 } catch (e: Exception) {
                     lines.append("NG ${t.name}: 検索でエラー（${e.message}）\n")
                     continue
@@ -233,27 +247,21 @@ object MailChecker {
         return lines.toString()
     }
 
+    /**
+     * Timestamp, title (subject), then the mail body — nothing else. No
+     * 差出人/受信 header lines and no trailing trigger-name line: those used to
+     * read like an extra "signature" tacked onto the ticket. The timestamp
+     * goes at the very top so it's the first thing on the receipt, not an
+     * afterthought at the bottom.
+     */
     private fun buildPrintText(message: Message, trigger: Trigger, bodyOnly: Boolean): String {
         val subject = message.subject ?: "(件名なし)"
-        val from = message.from?.joinToString(", ") { it.toString() } ?: "(不明)"
-        val date = message.sentDate?.toString() ?: ""
         val body = extractPlainText(message).take(2000)
-        if (bodyOnly) {
-            // Just the mail body, nothing else — one short time stamp so the
-            // kitchen can tell two tickets apart.
-            return buildString {
-                append(body)
-                append("\n")
-                append("${nowLabel()}  ${if (trigger.name.isNotBlank()) trigger.name else ""}\n")
-            }
-        }
         return buildString {
-            append("=== PRIME 注文通知 ===\n")
-            if (trigger.name.isNotBlank()) append("種別: ${trigger.name}\n")
-            append("差出人: $from\n")
-            append("件名: $subject\n")
-            if (date.isNotBlank()) append("受信: $date\n")
-            append("------------------------\n")
+            append(nowLabel())
+            append("\n")
+            append(subject)
+            append("\n")
             append(body)
             append("\n")
         }
