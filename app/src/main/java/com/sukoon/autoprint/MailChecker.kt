@@ -11,7 +11,6 @@ import javax.mail.search.AndTerm
 import javax.mail.search.BodyTerm
 import javax.mail.search.FlagTerm
 import javax.mail.search.FromStringTerm
-import javax.mail.search.OrTerm
 import javax.mail.search.SearchTerm
 import javax.mail.search.SubjectTerm
 import java.text.SimpleDateFormat
@@ -46,16 +45,56 @@ object MailChecker {
         return store
     }
 
-    /** Unread + (subject OR body contains keyword) + (from contains sender). */
-    private fun termFor(trigger: Trigger): SearchTerm {
-        var term: SearchTerm = FlagTerm(Flags(Flags.Flag.SEEN), false)
+    private fun msgKey(message: Message): String =
+        message.getHeader("Message-ID")?.firstOrNull() ?: message.messageNumber.toString()
+
+    /**
+     * Unread + (subject OR body contains keyword) + (from contains sender).
+     *
+     * This used to be a single combined query — AndTerm(UNSEEN, OrTerm(SUBJECT, BODY))
+     * [+ AndTerm(..., FROM)] — sent to Gmail as one IMAP SEARCH command. Gmail's IMAP
+     * SEARCH implementation is known to reply "BAD Could not parse command" for exactly
+     * this shape of query once the SUBJECT/BODY literal contains non-ASCII text (e.g.
+     * Japanese keywords): https://github.com/markmclaren/java-gmail-imap/issues/9 and
+     * several other IMAP client libraries report the same Gmail-side quirk. Once one
+     * trigger's search threw, the old code aborted the whole loop, so every trigger
+     * after the broken one silently stopped printing — forever, every cycle.
+     *
+     * Fix: run each criterion as its own simple single-term search (UNSEEN+SUBJECT,
+     * UNSEEN+BODY, UNSEEN+FROM) and merge the results here in Kotlin instead of asking
+     * Gmail to parse a compound OR/AND query with a literal inside it. Each of the
+     * three searches is also isolated in its own try/catch so a problem with one
+     * criterion can't take down the other two.
+     */
+    private fun searchTrigger(inbox: Folder, trigger: Trigger): List<Message> {
+        val unseen = FlagTerm(Flags(Flags.Flag.SEEN), false)
+
+        fun safeSearch(term: SearchTerm): List<Message> =
+            try {
+                inbox.search(AndTerm(unseen, term)).toList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+        val keywordHits = LinkedHashMap<String, Message>()
         if (trigger.keyword.isNotBlank()) {
-            term = AndTerm(term, OrTerm(SubjectTerm(trigger.keyword), BodyTerm(trigger.keyword)))
+            for (m in safeSearch(SubjectTerm(trigger.keyword))) keywordHits[msgKey(m)] = m
+            for (m in safeSearch(BodyTerm(trigger.keyword))) keywordHits[msgKey(m)] = m
         }
-        if (trigger.sender.isNotBlank()) {
-            term = AndTerm(term, FromStringTerm(trigger.sender))
+
+        if (trigger.sender.isBlank()) {
+            return keywordHits.values.toList()
         }
-        return term
+
+        val senderHits = LinkedHashMap<String, Message>()
+        for (m in safeSearch(FromStringTerm(trigger.sender))) senderHits[msgKey(m)] = m
+
+        return if (trigger.keyword.isBlank()) {
+            senderHits.values.toList()
+        } else {
+            // both filled in: must match keyword AND sender
+            keywordHits.keys.filter { it in senderHits }.mapNotNull { keywordHits[it] }
+        }
     }
 
     fun nowLabel(): String = SimpleDateFormat("HH:mm:ss").format(Date())
@@ -83,9 +122,16 @@ object MailChecker {
             inbox.open(Folder.READ_WRITE)
             val alreadyDone = HashSet<String>()
             for (trigger in triggers) {
-                val messages = inbox.search(termFor(trigger))
+                // Isolated per trigger: one trigger's search failing (bad keyword,
+                // transient IMAP error, etc.) must not stop the other triggers from
+                // being checked this cycle.
+                val messages = try {
+                    searchTrigger(inbox, trigger)
+                } catch (e: Exception) {
+                    emptyList()
+                }
                 for (message in messages) {
-                    val key = message.getHeader("Message-ID")?.firstOrNull() ?: message.messageNumber.toString()
+                    val key = msgKey(message)
                     if (!alreadyDone.add(key)) continue // matched by an earlier trigger already
                     val body = buildPrintText(message, trigger, Prefs.bodyOnly(context))
                     val fitted = PrinterHelper.wrap(PrinterHelper.tidy(body), Prefs.columns(context))
@@ -150,7 +196,12 @@ object MailChecker {
                     lines.append("NG ${t.name}: キーワードも送信元も空です\n")
                     continue
                 }
-                val hits = inbox.search(termFor(t))
+                val hits = try {
+                    searchTrigger(inbox, t)
+                } catch (e: Exception) {
+                    lines.append("NG ${t.name}: 検索でエラー（${e.message}）\n")
+                    continue
+                }
                 totalHits += hits.size
                 val mark = if (hits.isNotEmpty()) "OK" else "--"
                 lines.append("$mark ${t.name}: ${hits.size}件一致（${t.describe()}）\n")

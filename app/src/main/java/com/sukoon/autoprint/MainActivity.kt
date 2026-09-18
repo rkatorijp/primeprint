@@ -3,6 +3,7 @@ package com.sukoon.autoprint
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -10,6 +11,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.widget.ImageViewCompat
 import com.sukoon.autoprint.databinding.ActivityMainBinding
 import com.sukoon.autoprint.databinding.DialogTriggerBinding
 import com.sukoon.autoprint.databinding.ItemTriggerBinding
@@ -229,6 +231,8 @@ class MainActivity : AppCompatActivity() {
         val enabled = Prefs.get(this).getBoolean(Prefs.KEY_SERVICE_ENABLED, false)
         val count = triggers.count { it.enabled && it.isUsable }
         binding.textStatus.text = if (enabled) "状態: 監視中 · トリガー${count}件" else "状態: 停止中"
+        val dotColor = if (enabled) "#43A047" else "#E53935" // green = monitoring, red = stopped
+        ImageViewCompat.setImageTintList(binding.statusDot, ColorStateList.valueOf(android.graphics.Color.parseColor(dotColor)))
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
