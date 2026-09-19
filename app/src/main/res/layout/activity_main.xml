@@ -89,27 +89,32 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="プリンター"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
-
-        <EditText
-            android:id="@+id/editPrinterIp"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="プリンターIPアドレス（例: 192.168.1.50）"
-            android:inputType="text" />
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical">
 
-        <EditText
-            android:id="@+id/editPrinterPort"
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="プリンター（何台でも登録・個別にオンオフ）"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnAddPrinter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="＋ 追加" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/printerContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="ポート番号（通常 9100）"
-            android:inputType="number"
-            android:text="9100" />
+            android:orientation="vertical" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -146,7 +151,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="印刷レイアウト"
+            android:text="印刷レイアウト（登録した全プリンター共通）"
             android:textStyle="bold"
             android:layout_marginTop="20dp" />
 

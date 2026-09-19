@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <EditText
+        android:id="@+id/editPrinterName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="プリンター名（例: カウンター用）" />
+
+    <EditText
+        android:id="@+id/editPrinterIp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="プリンターIPアドレス（例: 192.168.1.50）"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/editPrinterPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="ポート番号（通常 9100）"
+        android:inputType="number"
+        android:text="9100" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textSize="12sp"
+        android:text="プリンターは何台でも登録できます。有効にした台すべてに同じ内容を印刷します（1台だけ有効＝その1台のみ、2台有効＝両方に印刷）。" />
+
+    <Switch
+        android:id="@+id/switchPrinterEnabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="このプリンターを有効にする" />
+</LinearLayout>

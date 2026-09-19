@@ -30,6 +30,21 @@
         android:textSize="12sp"
         android:text="どちらか片方だけでもOK。両方入れると「その送信元から届いた、そのキーワードを含むメール」だけを印刷します。" />
 
+    <EditText
+        android:id="@+id/editMaxLines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="印刷行数の上限（空欄=無制限）"
+        android:inputType="number" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="12sp"
+        android:text="これを超える分は「---以下省略---」として切り捨てます。紙の節約に。" />
+
     <Switch
         android:id="@+id/switchEnabled"
         android:layout_width="match_parent"
