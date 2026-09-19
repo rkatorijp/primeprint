@@ -8,10 +8,9 @@ object Prefs {
 
     const val KEY_GMAIL_ADDRESS = "gmail_address"
     const val KEY_APP_PASSWORD = "app_password"
-    const val KEY_PRINTER_IP = "printer_ip"
-    const val KEY_PRINTER_PORT = "printer_port"
     const val KEY_SERVICE_ENABLED = "service_enabled"
     const val KEY_TRIGGERS = "triggers_json"
+    const val KEY_PRINTERS = "printers_json"
     const val KEY_INTERVAL_SEC = "interval_sec"
     const val KEY_CHARSET = "printer_charset"
     const val KEY_BODY_ONLY = "body_only"
@@ -20,6 +19,10 @@ object Prefs {
     // Legacy single-trigger keys — read once, then migrated into KEY_TRIGGERS.
     private const val KEY_TRIGGER_KEYWORD = "trigger_keyword"
     private const val KEY_SENDER_FILTER = "sender_filter"
+
+    // Legacy single-printer keys — read once, then migrated into KEY_PRINTERS.
+    private const val KEY_PRINTER_IP = "printer_ip"
+    private const val KEY_PRINTER_PORT = "printer_port"
 
     fun get(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -53,5 +56,26 @@ object Prefs {
 
     fun saveTriggers(context: Context, list: List<Trigger>) {
         get(context).edit().putString(KEY_TRIGGERS, Trigger.listToJson(list)).apply()
+    }
+
+    fun loadPrinters(context: Context): MutableList<Printer> {
+        val prefs = get(context)
+        val stored = prefs.getString(KEY_PRINTERS, null)
+        if (stored != null) return Printer.listFromJson(stored)
+
+        // First run after the multi-printer update: carry the old single
+        // printer IP/port over as printer #1.
+        val ip = prefs.getString(KEY_PRINTER_IP, "") ?: ""
+        val port = (prefs.getString(KEY_PRINTER_PORT, "9100") ?: "9100").toIntOrNull() ?: 9100
+        val migrated = mutableListOf<Printer>()
+        if (ip.isNotBlank()) {
+            migrated.add(Printer(name = "プリンター1", ip = ip, port = port, enabled = true))
+            savePrinters(context, migrated)
+        }
+        return migrated
+    }
+
+    fun savePrinters(context: Context, list: List<Printer>) {
+        get(context).edit().putString(KEY_PRINTERS, Printer.listToJson(list)).apply()
     }
 }

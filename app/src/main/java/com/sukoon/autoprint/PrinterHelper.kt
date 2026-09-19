@@ -150,6 +150,20 @@ object PrinterHelper {
         return out.toString().trimEnd('\n') + "\n"
     }
 
+    /**
+     * Paper-saving cap: keeps only the first [maxLines] printed lines of
+     * already-wrapped text, dropping the rest instead of printing the whole
+     * mail. Call this AFTER [wrap], since "line" here means an actual printed
+     * line, not a source line that might still get split in two. maxLines <= 0
+     * means no limit — the text is returned unchanged.
+     */
+    fun limitLines(text: String, maxLines: Int): String {
+        if (maxLines <= 0) return text
+        val lines = text.split("\n")
+        if (lines.size <= maxLines) return text
+        return lines.take(maxLines).joinToString("\n") + "\n---以下省略---\n"
+    }
+
     /** Collapses the blank-line noise typical of order-notification mails. */
     fun tidy(text: String): String = text
         .split("\n")

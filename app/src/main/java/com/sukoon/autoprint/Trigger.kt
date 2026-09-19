@@ -11,13 +11,17 @@ import org.json.JSONObject
  * sender   : matched against the From header (blank = don't filter)
  * At least one of the two must be filled in, otherwise the trigger would match
  * every unread mail in the inbox.
+ * maxLines : paper-saving cap on how many printed lines this trigger's mail
+ *            produces, counted AFTER word-wrapping to the printer's column
+ *            width (0 or less = no limit, print the whole mail).
  */
 data class Trigger(
     var id: Long = System.currentTimeMillis(),
     var name: String = "",
     var keyword: String = "",
     var sender: String = "",
-    var enabled: Boolean = true
+    var enabled: Boolean = true,
+    var maxLines: Int = 0
 ) {
     val isUsable: Boolean get() = keyword.isNotBlank() || sender.isNotBlank()
 
@@ -25,6 +29,7 @@ data class Trigger(
         val parts = mutableListOf<String>()
         if (keyword.isNotBlank()) parts.add("キーワード「$keyword」")
         if (sender.isNotBlank()) parts.add("差出人 $sender")
+        if (maxLines > 0) parts.add("最大${maxLines}行")
         return if (parts.isEmpty()) "条件が未設定" else parts.joinToString(" / ")
     }
 
@@ -34,6 +39,7 @@ data class Trigger(
         put("keyword", keyword)
         put("sender", sender)
         put("enabled", enabled)
+        put("maxLines", maxLines)
     }
 
     companion object {
@@ -42,7 +48,8 @@ data class Trigger(
             name = o.optString("name", ""),
             keyword = o.optString("keyword", ""),
             sender = o.optString("sender", ""),
-            enabled = o.optBoolean("enabled", true)
+            enabled = o.optBoolean("enabled", true),
+            maxLines = o.optInt("maxLines", 0)
         )
 
         fun listToJson(list: List<Trigger>): String {

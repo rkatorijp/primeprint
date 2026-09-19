@@ -117,13 +117,14 @@ object MailChecker {
         val prefs = Prefs.get(context)
         val address = prefs.getString(Prefs.KEY_GMAIL_ADDRESS, "") ?: ""
         val password = prefs.getString(Prefs.KEY_APP_PASSWORD, "") ?: ""
-        val ip = prefs.getString(Prefs.KEY_PRINTER_IP, "") ?: ""
-        val port = (prefs.getString(Prefs.KEY_PRINTER_PORT, "9100") ?: "9100").toIntOrNull() ?: 9100
 
-        if (address.isBlank() || password.isBlank() || ip.isBlank()) return "設定が未完了です"
+        if (address.isBlank() || password.isBlank()) return "設定が未完了です"
 
         val triggers = Prefs.loadTriggers(context).filter { it.enabled && it.isUsable }
         if (triggers.isEmpty()) return "有効なトリガーがありません"
+
+        val printers = Prefs.loadPrinters(context).filter { it.enabled && it.isUsable }
+        if (printers.isEmpty()) return "有効なプリンターがありません"
 
         var printed = 0
         val store = openStore(address, password)
@@ -146,9 +147,21 @@ object MailChecker {
                     }
                     if (!hit) continue
                     val body = buildPrintText(message, trigger, Prefs.bodyOnly(context))
-                    val fitted = PrinterHelper.wrap(PrinterHelper.tidy(body), Prefs.columns(context))
-                    val ok = PrinterHelper.printText(ip, port, fitted, Prefs.charset(context))
-                    if (ok) {
+                    val wrapped = PrinterHelper.wrap(PrinterHelper.tidy(body), Prefs.columns(context))
+                    val fitted = PrinterHelper.limitLines(wrapped, trigger.maxLines)
+                    // Sent to every ENABLED printer — one enabled = that one only,
+                    // two enabled = both. One printer being offline must not stop
+                    // the others, so each is tried independently.
+                    var anyOk = false
+                    for (printer in printers) {
+                        val ok = try {
+                            PrinterHelper.printText(printer.ip, printer.port, fitted, Prefs.charset(context))
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (ok) anyOk = true
+                    }
+                    if (anyOk) {
                         message.setFlag(Flags.Flag.SEEN, true)
                         alreadyDone.add(key)
                         printed++
@@ -171,8 +184,7 @@ object MailChecker {
         val prefs = Prefs.get(context)
         val address = prefs.getString(Prefs.KEY_GMAIL_ADDRESS, "") ?: ""
         val password = prefs.getString(Prefs.KEY_APP_PASSWORD, "") ?: ""
-        val ip = prefs.getString(Prefs.KEY_PRINTER_IP, "") ?: ""
-        val port = (prefs.getString(Prefs.KEY_PRINTER_PORT, "9100") ?: "9100").toIntOrNull() ?: 9100
+        val printers = Prefs.loadPrinters(context)
         val lines = StringBuilder()
 
         if (address.isBlank() || password.isBlank()) {
@@ -235,16 +247,34 @@ object MailChecker {
             try { if (store.isConnected) store.close() } catch (_: Exception) {}
         }
 
-        if (ip.isBlank()) {
-            lines.append("NG プリンターIPが未入力です")
+        if (printers.isEmpty()) {
+            lines.append("NG プリンターが1台も登録されていません")
         } else {
-            val ok = PrinterHelper.printText(ip, port, "=== PRIME AUTO PRINT ===\n接続チェック ${nowLabel()}\n", Prefs.charset(context))
-            lines.append(
-                if (ok) "OK プリンターに1枚送信しました（$ip:$port）"
-                else "NG プリンターに送れません（IP・ポート・電源・同じWi-Fiか確認）"
-            )
+            val enabled = printers.filter { it.enabled && it.isUsable }
+            if (enabled.isEmpty()) {
+                lines.append("NG 有効なプリンターがありません（すべてオフ、またはIP未入力）")
+            }
+            for (printer in printers) {
+                if (!printer.enabled) {
+                    lines.append("-- ${printer.describe()}: オフ（スキップ）\n")
+                    continue
+                }
+                if (!printer.isUsable) {
+                    lines.append("NG ${printer.name.ifBlank { "プリンター" }}: IPが未入力です\n")
+                    continue
+                }
+                val ok = try {
+                    PrinterHelper.printText(printer.ip, printer.port, "=== PRIME AUTO PRINT ===\n接続チェック ${nowLabel()}\n", Prefs.charset(context))
+                } catch (e: Exception) {
+                    false
+                }
+                lines.append(
+                    if (ok) "OK ${printer.describe()} に1枚送信しました\n"
+                    else "NG ${printer.describe()} に送れません（IP・ポート・電源・同じWi-Fiか確認）\n"
+                )
+            }
         }
-        return lines.toString()
+        return lines.toString().trimEnd('\n')
     }
 
     /**
